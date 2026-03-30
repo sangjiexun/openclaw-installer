@@ -1,0 +1,354 @@
+{
+  "app": {
+    "title": "OpenClaw Provider Configuration",
+    "subtitle": "Configure model providers with custom API keys and endpoints"
+  },
+  "nav": {
+    "providers": "Providers",
+    "models": "Models",
+    "config": "Export Config",
+    "env": "Environment",
+    "install": "Install",
+    "uninstall": "Uninstall",
+    "packager": "Packager"
+  },
+  "provider": {
+    "openai": "OpenAI Compatible",
+    "ollama": "Ollama",
+    "vllm": "vLLM",
+    "selectType": "Select provider type",
+    "addProvider": "Add Provider",
+    "removeProvider": "Remove Provider",
+    "providerName": "Provider Name",
+    "providerNamePlaceholder": "e.g. my-openai",
+    "baseUrl": "Base URL",
+    "baseUrlPlaceholder": "https://api.openai.com/v1",
+    "apiKey": "API Key",
+    "apiKeyPlaceholder": "sk-...",
+    "apiType": "API Type",
+    "authMode": "Auth Mode",
+    "noProviders": "No providers configured yet. Add one to get started.",
+    "testConnection": "Test Connection",
+    "testing": "Testing...",
+    "connectionSuccess": "Connection successful",
+    "connectionFailed": "Connection failed",
+    "fetchModels": "Fetch Models",
+    "fetchingModels": "Fetching models...",
+    "modelsFound": "{{count}} models found",
+    "noModelsFound": "No models found",
+    "fetchError": "Failed to fetch models",
+    "ollamaDefaultUrl": "http://localhost:11434",
+    "vllmDefaultUrl": "http://localhost:8000/v1",
+    "openaiDefaultUrl": "https://api.openai.com/v1",
+    "headers": "Custom Headers",
+    "addHeader": "Add Header",
+    "headerKey": "Header Name",
+    "headerValue": "Header Value",
+    "injectNumCtx": "Inject num_ctx (Ollama)",
+    "authHeader": "Include Auth Header"
+  },
+  "model": {
+    "title": "Discovered Models",
+    "id": "Model ID",
+    "name": "Display Name",
+    "reasoning": "Reasoning",
+    "contextWindow": "Context Window",
+    "maxTokens": "Max Tokens",
+    "inputTypes": "Input Types",
+    "selected": "Selected",
+    "selectAll": "Select All",
+    "deselectAll": "Deselect All",
+    "noModels": "No models discovered. Fetch models from a provider first.",
+    "text": "Text",
+    "image": "Image",
+    "tokens": "{{count}} tokens"
+  },
+  "config": {
+    "title": "Generated Configuration",
+    "description": "Copy this configuration into your openclaw.json file under the models.providers key.",
+    "copy": "Copy to Clipboard",
+    "copied": "Copied!",
+    "download": "Download Config",
+    "empty": "Configure at least one provider to generate config."
+  },
+  "env": {
+    "title": "System Environment Check",
+    "subtitle": "Verify your system meets OpenClaw requirements",
+    "runCheck": "Run Check",
+    "recheck": "Re-check",
+    "checking": "Checking...",
+    "status": {
+      "pass": "Pass",
+      "warn": "Warning",
+      "fail": "Fail",
+      "unknown": "Unknown"
+    },
+    "sections": {
+      "runtime": "Runtime Environment",
+      "config": "Configuration Paths",
+      "envVars": "Environment Variables",
+      "network": "Network & Ports",
+      "deps": "Dependencies",
+      "install": "Offline Install Guide"
+    },
+    "checks": {
+      "nodeVersion": "Node.js Version",
+      "nodeVersionDesc": "OpenClaw requires Node ≥22.14.0. Node 24 is recommended.",
+      "nodeExecPath": "Node Executable Path",
+      "nodePath": "PATH Environment",
+      "platform": "Operating System",
+      "arch": "Architecture",
+      "pnpm": "pnpm",
+      "npm": "npm",
+      "bun": "Bun Runtime",
+      "docker": "Docker",
+      "git": "Git",
+      "configDir": "State Directory",
+      "configDirDesc": "~/.openclaw/ — stores config, sessions, credentials",
+      "configFile": "Config File",
+      "configFileDesc": "~/.openclaw/openclaw.json",
+      "credentialsDir": "Credentials Directory",
+      "credentialsDirDesc": "~/.openclaw/credentials/",
+      "workspaceDir": "Workspace Directory",
+      "workspaceDirDesc": "~/.openclaw/workspace/",
+      "gatewayPort": "Gateway Port",
+      "gatewayPortDesc": "Default port 18789",
+      "ollamaService": "Ollama Service",
+      "ollamaServiceDesc": "Local Ollama instance at localhost:11434"
+    },
+    "envVarGroups": {
+      "gateway": "Gateway",
+      "providers": "Model Providers",
+      "channels": "Channels",
+      "tools": "Tools & Media"
+    },
+    "envVarTable": {
+      "name": "Variable",
+      "status": "Status",
+      "value": "Value",
+      "set": "Set",
+      "notSet": "Not Set",
+      "description": "Description"
+    },
+    "tips": {
+      "title": "Optimization Tips",
+      "nodeUpgrade": "Upgrade to Node 24 for best performance and latest features.",
+      "gatewayToken": "Set OPENCLAW_GATEWAY_TOKEN when binding beyond loopback for security.",
+      "providerKey": "Set at least one model provider API key (OPENAI_API_KEY, ANTHROPIC_API_KEY, etc.).",
+      "runDoctor": "Run `openclaw doctor` for a comprehensive health check and auto-repair.",
+      "configPermissions": "Ensure config file permissions are 600 (chmod 600 ~/.openclaw/openclaw.json).",
+      "shellEnv": "Enable OPENCLAW_LOAD_SHELL_ENV=1 to auto-import API keys from your login shell.",
+      "ollamaLocal": "For local models, install Ollama: https://ollama.ai/download",
+      "dockerSandbox": "Install Docker for sandboxed tool execution."
+    },
+    "install": {
+      "title": "Offline / Manual Installation",
+      "scriptTitle": "Installer Script (Online)",
+      "scriptDesc": "The fastest way — auto-detects OS, installs Node if needed, and launches onboarding.",
+      "npmTitle": "npm Global Install",
+      "npmDesc": "If you already have Node.js installed:",
+      "sourceTitle": "From Source",
+      "sourceDesc": "For contributors or custom builds:",
+      "offlineTitle": "Offline Install",
+      "offlineDesc": "For air-gapped or restricted environments:",
+      "offlineSteps": {
+        "step1": "On a machine with internet, run: npm pack openclaw@latest",
+        "step2": "Transfer the .tgz file to the target machine",
+        "step3": "On the target machine: npm install -g openclaw-<version>.tgz",
+        "step4": "Run: openclaw onboard --install-daemon"
+      },
+      "dockerTitle": "Docker",
+      "dockerDesc": "For containerized deployments:",
+      "envSetup": "Environment Setup",
+      "envSetupDesc": "After installation, configure environment variables:",
+      "envSetupSteps": {
+        "step1": "Copy .env.example to ~/.openclaw/.env",
+        "step2": "Fill in your API keys and tokens",
+        "step3": "Run: openclaw onboard"
+      }
+    }
+  },
+  "installer": {
+    "title": "One-Click Install",
+    "subtitle": "Choose an installation method and install OpenClaw with one click",
+    "detecting": "Detecting available methods...",
+    "alreadyInstalled": "OpenClaw is already installed",
+    "version": "Version: {{version}}",
+    "reinstall": "You can reinstall or upgrade using any method below.",
+    "methodAvailable": "Available",
+    "methodUnavailable": "Unavailable",
+    "install": "Install",
+    "installing": "Installing...",
+    "installSuccess": "Installation successful",
+    "installFailed": "Installation failed",
+    "recommended": "Recommended",
+    "methods": {
+      "script": {
+        "title": "Installer Script",
+        "desc": "Auto-detects OS, installs Node if needed. The fastest way to get started.",
+        "badge": "macOS / Linux"
+      },
+      "npm": {
+        "title": "npm Global",
+        "desc": "Install via npm package manager. Requires Node ≥22.14.0.",
+        "badge": "All Platforms"
+      },
+      "pnpm": {
+        "title": "pnpm Global",
+        "desc": "Install via pnpm. Requires pnpm and Node ≥22.14.0.",
+        "badge": "All Platforms"
+      },
+      "docker": {
+        "title": "Docker Container",
+        "desc": "Run in an isolated container. Requires Docker daemon running.",
+        "badge": "All Platforms"
+      },
+      "vagrant": {
+        "title": "Vagrant VM",
+        "desc": "Create a full VirtualBox VM with OpenClaw pre-installed. Supports Kali Linux and Windows 10.",
+        "badge": "VirtualBox"
+      },
+      "source": {
+        "title": "From Source",
+        "desc": "Clone and build from source. For contributors and custom builds.",
+        "badge": "Advanced"
+      }
+    },
+    "source": {
+      "chinaMirror": "🇨🇳 China Mirror Acceleration",
+      "chinaMirrorDesc": "Use ghproxy.com to accelerate Git clone",
+      "requirements": "System Requirements"
+    },
+    "output": "Output",
+    "noOutput": "No output yet. Click Install to begin.",
+    "startServer": "Start the server:",
+    "docker": {
+      "mirror": "Registry Mirror",
+      "customRegistry": "Custom Registry URL",
+      "image": "Image Name",
+      "containerName": "Container Name",
+      "port": "Host Port",
+      "daemonHint": "If all mirrors fail, configure Docker daemon mirrors directly:",
+      "btpanelInstall": "🇨🇳 Install Docker via BT Panel",
+      "btpanelDesc": "China-optimized Docker installer (bt.cn)",
+      "mode": "Install Mode",
+      "modeBuild": "🔨 Local Build (Recommended)",
+      "modeBuildDesc": "Build from project Dockerfile locally, no network pull needed",
+      "modePull": "☁️ Remote Pull",
+      "modePullDesc": "Pull pre-built image from a registry, requires network access",
+      "buildTag": "Build Tag",
+      "buildTagHint": "Tag name for the locally built image, default openclaw:local"
+    },
+    "npm": {
+      "registry": "npm Registry URL (optional)",
+      "registryHint": "Leave empty for default. Use https://registry.npmmirror.com for China."
+    },
+    "vagrant": {
+      "os": "Guest Operating System",
+      "memory": "Memory",
+      "cpus": "CPU Cores",
+      "port": "Gateway Port",
+      "gui": "Enable GUI (show VirtualBox window)",
+      "kaliDesc": "Rolling release, lightweight, SSH access. Box ~2GB.",
+      "windowsDesc": "Full desktop, RDP access. Box ~6GB, slower first boot.",
+      "kaliNote": "First run downloads the Kali box (~2GB). SSH into the VM with: vagrant ssh",
+      "windowsNote": "First run downloads the Windows 10 box (~6GB). Access via RDP: vagrant rdp. Enable GUI above to see the VirtualBox window.",
+      "autoInstall": "Install via {{pm}}",
+      "chinaMirror": "🇨🇳 China Acceleration Mirror",
+      "chinaMirrorDesc": "Use USTC mirror for faster Vagrant box downloads in China (mirrors.ustc.edu.cn)",
+      "starting": "Starting...",
+      "waitingOutput": "Waiting for output..."
+    }
+  },
+  "packager": {
+    "selectTargets": "Select Target Platforms",
+    "selectDesc": "Choose which platforms to generate installer packages for.",
+    "selectAll": "Select All",
+    "deselectAll": "Deselect All",
+    "options": "Package Options",
+    "installDir": "Install Directory",
+    "nodeVer": "Node.js Version",
+    "envVars": "Built-in Environment Variables",
+    "envVarsHint": "Comma-separated KEY=VALUE pairs baked into the install script.",
+    "build": "Build Packages",
+    "building": "Building...",
+    "buildSuccess": "Build completed",
+    "buildFailed": "Build failed",
+    "selectedCount": "{{count}} platform(s) selected",
+    "downloads": "Built Packages",
+    "download": "Download",
+    "noPackages": "No packages yet. Select targets and click Build.",
+    "targets": {
+      "docker": "Docker image tar archive",
+      "vagrant-kali": "Kali Linux VM bundle",
+      "vagrant-windows": "Windows 10 VM bundle",
+      "windows-x64": "64-bit offline installer",
+      "windows-x86": "32-bit offline installer",
+      "redhat": "RPM package",
+      "uos": "UOS deb package",
+      "ubuntukylin": "Ubuntu Kylin deb package"
+    }
+  },
+  "uninstaller": {
+    "title": "Uninstall OpenClaw",
+    "subtitle": "Remove OpenClaw and optionally clean up all data",
+    "notInstalled": "OpenClaw does not appear to be installed.",
+    "detecting": "Detecting installation...",
+    "currentInstall": "Current Installation",
+    "scope": "Uninstall Scope",
+    "scopeDesc": "Choose what to remove:",
+    "methods": {
+      "npm": {
+        "title": "npm Package",
+        "desc": "Remove the globally installed npm package"
+      },
+      "pnpm": {
+        "title": "pnpm Package",
+        "desc": "Remove the globally installed pnpm package"
+      },
+      "docker": {
+        "title": "Docker Container & Image",
+        "desc": "Stop and remove the Docker container and image"
+      },
+      "vagrant": {
+        "title": "Vagrant VMs",
+        "desc": "Destroy all Vagrant VMs (Kali and Windows) and remove Vagrantfiles"
+      },
+      "all": {
+        "title": "Full Uninstall",
+        "desc": "Remove all: npm, pnpm, Docker, Vagrant VMs, stop gateway, remove services"
+      }
+    },
+    "removeData": "Also remove data directory (~/.openclaw/)",
+    "removeDataWarn": "This will permanently delete all config, sessions, credentials, and workspace data.",
+    "uninstall": "Uninstall",
+    "uninstalling": "Uninstalling...",
+    "confirm": "Are you sure? This action cannot be undone.",
+    "success": "Uninstall completed",
+    "failed": "Some steps failed",
+    "steps": "Uninstall Steps",
+    "stepOk": "Done",
+    "stepFail": "Failed"
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "add": "Add",
+    "close": "Close",
+    "yes": "Yes",
+    "no": "No",
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success"
+  },
+  "theme": {
+    "light": "Light",
+    "dark": "Dark"
+  },
+  "lang": {
+    "en": "English",
+    "zh": "中文"
+  }
+}

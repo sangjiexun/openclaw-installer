@@ -1,0 +1,44 @@
+# OpenClaw — Kali Linux Vagrant VM
+# Usage: vagrant up
+Vagrant.configure("2") do |config|
+  config.vm.box = "kalilinux/rolling"
+  config.vm.hostname = "openclaw-kali"
+  config.vm.network "forwarded_port", guest: 18789, host: __PORT__
+  config.vm.network "private_network", type: "dhcp"
+
+  config.vm.provider "virtualbox" do |vb|
+    vb.name = "openclaw-kali"
+    vb.memory = __MEMORY__
+    vb.cpus = __CPUS__
+    vb.gui = false
+  end
+
+  config.vm.synced_folder "__SYNC_DIR__", "/home/vagrant/.openclaw",
+    create: true, owner: "vagrant", group: "vagrant"
+
+  config.vm.provision "shell", inline: <<-SHELL
+    set -eux
+    export DEBIAN_FRONTEND=noninteractive
+
+    # System update
+    apt-get update -qq
+    apt-get install -y -qq curl git build-essential
+
+    # Install Node.js 24
+    curl -fsSL https://deb.nodesource.com/setup_24.x | bash -
+    apt-get install -y -qq nodejs
+
+    # Install OpenClaw
+    npm install -g openclaw@latest
+
+    # Run onboarding (non-interactive)
+    su - vagrant -c "openclaw onboard --install-daemon --non-interactive" || true
+
+    echo ""
+    echo "========================================="
+    echo " OpenClaw installed on Kali Linux"
+    echo " Gateway: http://localhost:__PORT__"
+    echo " SSH:     vagrant ssh"
+    echo "========================================="
+  SHELL
+end
