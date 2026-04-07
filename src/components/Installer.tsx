@@ -113,6 +113,10 @@ export function Installer() {
   const [vagrantLogs, setVagrantLogs] = useState<string[]>([]);
   const [vagrantStep, setVagrantStep] = useState("");
 
+  // Source-zip options
+  const [useZipSource, setUseZipSource] = useState(true);
+  const [zipVersion, setZipVersion] = useState("latest");
+
   // Auto-install deps
   const [installingDeps, setInstallingDeps] = useState(false);
   const [depsResult, setDepsResult] = useState<{ ok: boolean; steps: Array<{ target: string; ok: boolean; message: string }> } | null>(null);
@@ -175,6 +179,42 @@ export function Installer() {
       }
       if (method === "source") {
         options.chinaMirror = chinaMirror ? "true" : "false";
+      }
+
+      // Route source+zip through the dedicated endpoint
+      if (method === "source" && useZipSource) {
+        const res = await fetch("http://localhost:3456/api/install/source-zip", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ version: zipVersion || "latest" }),
+        });
+        const reader = res.body?.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        if (reader) {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split("\n");
+            buffer = lines.pop() || "";
+            let eventType = "";
+            for (const line of lines) {
+              if (line.startsWith("event: ")) {
+                eventType = line.slice(7);
+              } else if (line.startsWith("data: ")) {
+                try {
+                  const data = JSON.parse(line.slice(6));
+                  if (eventType === "log") setVagrantLogs((p) => [...p.slice(-100), data.text]);
+                  else if (eventType === "step") setVagrantStep(data.message);
+                  else if (eventType === "done") setResult({ ok: data.ok, message: data.message || "" });
+                } catch { /* ignore */ }
+              }
+            }
+          }
+        }
+        setInstalling(null);
+        return;
       }
 
       const actualMethod =
@@ -555,25 +595,59 @@ export function Installer() {
     if (methodId === "source") {
       return (
         <div className="mt-3 pt-3 border-t space-y-3">
-          <div className="flex items-center gap-3 p-2.5 rounded-md bg-muted/50 border">
+          {/* Zip source toggle */}
+          <div className="flex items-center gap-3 p-2.5 rounded-md bg-primary/5 border border-primary/20">
             <input
               type="checkbox"
-              id="source-china-mirror"
-              checked={chinaMirror}
-              onChange={(e) => setChinaMirror(e.target.checked)}
+              id="source-use-zip"
+              checked={useZipSource}
+              onChange={(e) => setUseZipSource(e.target.checked)}
               className="rounded border-input"
             />
-            <div>
-              <Label htmlFor="source-china-mirror" className="text-xs font-medium">{t("installer.source.chinaMirror")}</Label>
-              <p className="text-xs text-muted-foreground">{t("installer.source.chinaMirrorDesc")}</p>
+            <div className="flex-1">
+              <Label htmlFor="source-use-zip" className="text-xs font-medium">
+                {t("installer.source.zipSource")} <span className="text-primary font-normal">(hunyuandata.cn)</span>
+              </Label>
+              <p className="text-xs text-muted-foreground">{t("installer.source.zipSourceDesc")}</p>
             </div>
           </div>
+
+          {useZipSource && (
+            <div className="space-y-1.5">
+              <Label htmlFor="zip-version" className="text-xs font-medium">{t("installer.source.zipVersion")}</Label>
+              <Input
+                id="zip-version"
+                value={zipVersion}
+                onChange={(e) => setZipVersion(e.target.value)}
+                placeholder="latest"
+                className="h-7 text-xs font-mono"
+              />
+              <p className="text-xs text-muted-foreground">{t("installer.source.zipVersionHint")}</p>
+            </div>
+          )}
+
+          {!useZipSource && (
+            <div className="flex items-center gap-3 p-2.5 rounded-md bg-muted/50 border">
+              <input
+                type="checkbox"
+                id="source-china-mirror"
+                checked={chinaMirror}
+                onChange={(e) => setChinaMirror(e.target.checked)}
+                className="rounded border-input"
+              />
+              <div>
+                <Label htmlFor="source-china-mirror" className="text-xs font-medium">{t("installer.source.chinaMirror")}</Label>
+                <p className="text-xs text-muted-foreground">{t("installer.source.chinaMirrorDesc")}</p>
+              </div>
+            </div>
+          )}
+
           <div className="p-2.5 rounded-md bg-muted/50 border">
             <p className="text-xs text-muted-foreground">
               <AlertTriangle className="h-3 w-3 inline mr-1 text-yellow-500" />
               {t("installer.source.requirements")}
             </p>
-            <p className="text-xs font-mono text-muted-foreground mt-1">git, pnpm, Node.js 22+</p>
+            <p className="text-xs font-mono text-muted-foreground mt-1">pnpm, Node.js 22+</p>
           </div>
         </div>
       );

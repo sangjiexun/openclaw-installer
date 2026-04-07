@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Plus, Server, Brain, FileJson, Monitor, Download, Trash2, Package } from "lucide-react";
+import { Plus, Server, Brain, FileJson, Monitor, Download, Trash2, Package, Tag, Settings, Activity } from "lucide-react";
 import { Header } from "./components/Header";
 import { ProviderForm } from "./components/ProviderForm";
 import { ModelList } from "./components/ModelList";
@@ -9,6 +9,9 @@ import { EnvironmentCheck } from "./components/EnvironmentCheck";
 import { Installer } from "./components/Installer";
 import { Uninstaller } from "./components/Uninstaller";
 import { Packager } from "./components/Packager";
+import { VersionManager } from "./components/VersionManager";
+import { ConfigManager } from "./components/ConfigManager";
+import { GatewayManager } from "./components/GatewayManager";
 import { Button } from "./components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "./components/ui/tabs";
 import { useProviderStore } from "./store";
@@ -35,8 +38,8 @@ export default function App() {
       <Header />
       <main className="max-w-5xl mx-auto px-6 py-8">
         <Tabs defaultValue="env" className="space-y-6">
-          <div className="flex items-center justify-between">
-            <TabsList>
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <TabsList className="flex-wrap h-auto gap-1">
               <TabsTrigger value="env" className="gap-1.5">
                 <Monitor className="h-4 w-4" />
                 {t("nav.env")}
@@ -44,6 +47,18 @@ export default function App() {
               <TabsTrigger value="install" className="gap-1.5">
                 <Download className="h-4 w-4" />
                 {t("nav.install")}
+              </TabsTrigger>
+              <TabsTrigger value="versions" className="gap-1.5">
+                <Tag className="h-4 w-4" />
+                {t("nav.versions")}
+              </TabsTrigger>
+              <TabsTrigger value="gateway" className="gap-1.5">
+                <Activity className="h-4 w-4" />
+                {t("nav.gateway")}
+              </TabsTrigger>
+              <TabsTrigger value="configmgr" className="gap-1.5">
+                <Settings className="h-4 w-4" />
+                {t("nav.configMgr")}
               </TabsTrigger>
               <TabsTrigger value="uninstall" className="gap-1.5">
                 <Trash2 className="h-4 w-4" />
@@ -98,6 +113,18 @@ export default function App() {
 
           <TabsContent value="install">
             <Installer />
+          </TabsContent>
+
+          <TabsContent value="versions">
+            <VersionManager />
+          </TabsContent>
+
+          <TabsContent value="gateway">
+            <GatewayManager />
+          </TabsContent>
+
+          <TabsContent value="configmgr">
+            <ConfigManager />
           </TabsContent>
 
           <TabsContent value="uninstall">

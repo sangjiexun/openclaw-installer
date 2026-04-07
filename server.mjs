@@ -5,7 +5,7 @@
  */
 import { createServer } from "node:http";
 import { execSync, spawn } from "node:child_process";
-import { existsSync, statSync, rmSync, mkdirSync } from "node:fs";
+import { existsSync, statSync, rmSync, mkdirSync, watch as fsWatch } from "node:fs";
 import { homedir, platform, arch, cpus, totalmem, tmpdir } from "node:os";
 import { join } from "node:path";
 import { createConnection } from "node:net";
@@ -1772,6 +1772,500 @@ vagrant up
   }
 }
 
+// ─── Versions fetcher ────────────────────────────────────────────────
+
+const VERSIONS_URL = "https://www.hunyuandata.cn/openclaw-versions.html";
+const LATEST_ZIP_URL = "https://www.hunyuandata.cn/openclaw/latest/openclaw-latest-source.zip";
+
+async function fetchVersionsList() {
+  try {
+    const res = await fetch(VERSIONS_URL, {
+      signal: AbortSignal.timeout(15000),
+      headers: { "User-Agent": "openclaw-installer/1.0" },
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const html = await res.text();
+
+    // Extract latest version from heading "🚀 vX.X.X"
+    const latestMatch = html.match(/🚀\s+v?([\d.]+(?:-[\w.]+)?)/);
+    const latestVersion = latestMatch ? latestMatch[1] : null;
+
+    // Extract latest download URL from the "下载最新源码" link
+    const latestUrlMatch = html.match(/href="(https:\/\/www\.hunyuandata\.cn\/openclaw\/[^"]+source\.zip)"/);
+    const latestUrl = latestUrlMatch ? latestUrlMatch[1] : LATEST_ZIP_URL;
+
+    // Extract changelog
+    const changelogMatch = html.match(/###\s+Breaking[\s\S]*?(?=##\s+历史版本)/);
+    const changelog = changelogMatch ? changelogMatch[0].slice(0, 600).trim() : null;
+
+    // Extract history table: matches sequences of "vVER DATE [⬇ 下载](URL)"
+    const rows = [];
+    const rowRe = /v([\d.]+(?:-[\w.]+)?)\s+([\d-]{10})\s*\[?[⬇\s下载]+?\]?\(?([^)\s"]+source\.zip)/g;
+    let m;
+    while ((m = rowRe.exec(html)) !== null) {
+      rows.push({
+        version: m[1],
+        date: m[2],
+        zipUrl: m[3].startsWith("http") ? m[3] : `https://www.hunyuandata.cn${m[3]}`,
+      });
+    }
+    // De-duplicate by version
+    const seen = new Set();
+    const history = rows.filter((r) => {
+      if (seen.has(r.version)) return false;
+      seen.add(r.version);
+      return true;
+    });
+
+    return { ok: true, latestVersion, latestUrl, history, changelog };
+  } catch (err) {
+    return { ok: false, error: String(err), latestVersion: null, latestUrl: LATEST_ZIP_URL, history: [], changelog: null };
+  }
+}
+
+// ─── Config read / write / watch ─────────────────────────────────────
+
+const CONFIG_PATH = join(HOME, ".openclaw", "openclaw.json");
+const configWatchers = new Set();
+
+async function readOpenclawConfig() {
+  try {
+    if (!existsSync(CONFIG_PATH)) {
+      // Create skeleton config
+      mkdirSync(join(HOME, ".openclaw"), { recursive: true });
+      const skeleton = {
+        models: { providers: [] },
+        gateway: { port: 18789 },
+      };
+      const { writeFileSync: wf } = await import("node:fs");
+      wf(CONFIG_PATH, JSON.stringify(skeleton, null, 2), { mode: 0o600 });
+      return { ok: true, content: JSON.stringify(skeleton, null, 2), exists: false };
+    }
+    const { readFileSync: rf } = await import("node:fs");
+    const content = rf(CONFIG_PATH, "utf-8");
+    return { ok: true, content, exists: true };
+  } catch (err) {
+    return { ok: false, error: String(err), content: "", exists: false };
+  }
+}
+
+async function writeOpenclawConfig(content) {
+  try {
+    // Validate JSON before writing
+    JSON.parse(content);
+    mkdirSync(join(HOME, ".openclaw"), { recursive: true });
+    const { writeFileSync: wf } = await import("node:fs");
+    wf(CONFIG_PATH, content, { mode: 0o600 });
+    // Trigger reload
+    await reloadGatewayConfig();
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof SyntaxError ? `JSON parse error: ${err.message}` : String(err) };
+  }
+}
+
+async function reloadGatewayConfig() {
+  // Try openclaw gateway reload first, fallback to signal
+  const reload = await runCommand("openclaw", ["gateway", "reload"]);
+  if (reload.ok) return { ok: true, message: "Gateway reloaded" };
+  // Fallback: send SIGHUP to gateway process (Unix only)
+  if (platform() !== "win32") {
+    const sig = await runCommand("pkill", ["-HUP", "-f", "openclaw-gateway"]);
+    if (sig.ok) return { ok: true, message: "Sent SIGHUP to gateway" };
+  }
+  return { ok: false, message: reload.stderr || "Reload failed — gateway may not be running" };
+}
+
+// Watch config file and push SSE change events to connected clients
+let _configWatcherHandle = null;
+
+function ensureConfigFileWatcher() {
+  if (_configWatcherHandle) return;
+  const { watch: fsWatch } = await_import_watch();
+  if (!fsWatch) return;
+  try {
+    _configWatcherHandle = fsWatch(CONFIG_PATH, { persistent: false }, (eventType) => {
+      if (eventType === "change" || eventType === "rename") {
+        const payload = JSON.stringify({ event: "changed", timestamp: Date.now() });
+        for (const client of configWatchers) {
+          try { client.write(`data: ${payload}\n\n`); } catch { configWatchers.delete(client); }
+        }
+      }
+    });
+    _configWatcherHandle.on("error", () => { _configWatcherHandle = null; });
+  } catch { /* ignore if file doesn't exist yet */ }
+}
+
+
+function startConfigFileWatcher() {
+  if (_configWatcherHandle) return;
+  try {
+    const dir = join(HOME, ".openclaw");
+    if (!existsSync(dir)) return;
+    _configWatcherHandle = fsWatch(CONFIG_PATH, { persistent: false }, (eventType) => {
+      if (eventType === "change" || eventType === "rename") {
+        notifyConfigWatchers();
+      }
+    });
+    _configWatcherHandle.on("error", () => { _configWatcherHandle = null; });
+  } catch { /* ignore */ }
+}
+
+function notifyConfigWatchers() {
+  const payload = JSON.stringify({ event: "changed", timestamp: Date.now() });
+  for (const client of configWatchers) {
+    try { client.write(`event: change\ndata: ${payload}\n\n`); } catch { configWatchers.delete(client); }
+  }
+}
+
+function registerConfigWatcher(res) {
+  configWatchers.add(res);
+  startConfigFileWatcher();
+  // Send initial ping
+  res.write(`event: ping\ndata: ${JSON.stringify({ ok: true })}\n\n`);
+}
+
+function unregisterConfigWatcher(res) {
+  configWatchers.delete(res);
+}
+
+// ─── Gateway control ──────────────────────────────────────────────────
+
+async function getGatewayStatus() {
+  const isUp = await checkPort("127.0.0.1", 18789);
+  const procInfo = tryExec(
+    platform() === "win32"
+      ? "powershell -NoProfile -Command \"Get-Process | Where-Object {$_.ProcessName -match 'openclaw'} | Select-Object -First 1 Id,ProcessName | ConvertTo-Json\""
+      : "pgrep -a openclaw-gateway 2>/dev/null | head -1",
+  );
+  const version = tryExec("openclaw --version");
+  const daemonStatus =
+    platform() === "darwin"
+      ? tryExec("launchctl print gui/$(id -u) 2>/dev/null | grep openclaw | head -1")
+      : platform() === "linux"
+        ? tryExec("systemctl --user is-active openclaw 2>/dev/null")
+        : null;
+
+  // Gateway process info
+  let pid = null;
+  if (procInfo && platform() !== "win32") {
+    const pidMatch = procInfo.match(/^\s*(\d+)/);
+    if (pidMatch) pid = parseInt(pidMatch[1], 10);
+  }
+
+  return {
+    running: isUp,
+    port: 18789,
+    pid,
+    version: version || null,
+    daemonStatus: daemonStatus || null,
+  };
+}
+
+async function stopGateway() {
+  const steps = [];
+  if (platform() === "win32") {
+    const kill = await runCommand("powershell", ["-NoProfile", "-Command",
+      "Get-Process | Where-Object {$_.ProcessName -match 'openclaw'} | Stop-Process -Force"]);
+    steps.push({ step: "kill", ok: true, message: kill.ok ? "Gateway stopped" : "No gateway process found" });
+  } else {
+    const kill = await runCommand("pkill", ["-9", "-f", "openclaw-gateway"]);
+    steps.push({ step: "kill", ok: true, message: kill.ok ? "Gateway stopped" : "No gateway process found" });
+  }
+  return { ok: true, steps };
+}
+
+async function handleGatewayControl(res, action) {
+  const send = (event, data) => {
+    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  };
+
+  try {
+    if (action === "restart") {
+      send("step", { step: "stop", status: "running", message: "Stopping gateway..." });
+      await stopGateway();
+      await new Promise((r) => setTimeout(r, 1500));
+      send("step", { step: "stop", status: "done", message: "Gateway stopped" });
+    }
+
+    send("step", { step: "start", status: "running", message: "Starting gateway..." });
+    send("progress", { percent: 20, line: "Launching openclaw gateway..." });
+
+    // Try daemon start first
+    const daemonStart = await runCommand("openclaw", ["gateway", "start"]);
+    if (!daemonStart.ok) {
+      // Fallback: start directly in background
+      const bgStart = await runCommand("openclaw", ["gateway", "--allow-unconfigured", "--bind", "loopback", "--port", "18789"]);
+      if (!bgStart.ok) {
+        send("done", { ok: false, message: bgStart.stderr || "Failed to start gateway" });
+        res.end();
+        return;
+      }
+    }
+
+    // Wait for gateway to come up
+    let attempts = 0;
+    let up = false;
+    while (attempts < 10 && !up) {
+      await new Promise((r) => setTimeout(r, 1000));
+      up = await checkPort("127.0.0.1", 18789);
+      send("progress", { percent: 20 + attempts * 8, line: up ? "Gateway is up!" : `Waiting... (${attempts + 1}/10)` });
+      attempts++;
+    }
+
+    send("step", { step: "start", status: up ? "done" : "error", message: up ? "Gateway started successfully" : "Gateway failed to start" });
+    send("progress", { percent: 100, line: up ? "Running on port 18789" : "Check logs for details" });
+    send("done", { ok: up, message: up ? "Gateway is running on port 18789" : "Gateway did not respond on port 18789" });
+  } catch (err) {
+    send("done", { ok: false, message: String(err) });
+  }
+
+  res.end();
+}
+
+async function streamGatewayLogs(res) {
+  const send = (data) => {
+    res.write(`data: ${JSON.stringify(data)}\n\n`);
+  };
+
+  try {
+    const logFile = join(HOME, ".openclaw", "logs", "gateway.log");
+    if (!existsSync(logFile)) {
+      send({ text: "No log file found at " + logFile, type: "info" });
+      send({ text: "Gateway may not be running or logs not yet written.", type: "info" });
+      res.end();
+      return;
+    }
+
+    // Send last 100 lines of existing log
+    const { readFileSync: rf } = await import("node:fs");
+    const existing = rf(logFile, "utf-8");
+    const lines = existing.split("\n").filter(Boolean).slice(-100);
+    for (const line of lines) {
+      send({ text: line, type: "existing" });
+    }
+
+    // Watch for new lines
+    const { statSync: fss } = await import("node:fs");
+    let size = fss(logFile).size;
+    const watcher = fsWatch(logFile, { persistent: false }, () => {
+      try {
+        const { statSync: ss2, createReadStream: crs } = { statSync: statSync, createReadStream: null };
+        // Read new bytes
+        import("node:fs").then(({ statSync: ss3, createReadStream: crs2 }) => {
+          const newSize = ss3(logFile).size;
+          if (newSize > size) {
+            const stream = crs2(logFile, { start: size, end: newSize - 1 });
+            let chunk = "";
+            stream.on("data", (d) => { chunk += d.toString(); });
+            stream.on("end", () => {
+              for (const line of chunk.split("\n").filter(Boolean)) {
+                try { res.write(`data: ${JSON.stringify({ text: line, type: "new" })}\n\n`); } catch { watcher.close(); }
+              }
+              size = newSize;
+            });
+          }
+        }).catch(() => {});
+      } catch { /* ignore */ }
+    });
+
+    res.on("close", () => { try { watcher.close(); } catch { /* ignore */ } });
+    // Keep connection alive for 5 minutes max
+    setTimeout(() => { try { res.end(); } catch { /* ignore */ } }, 300_000);
+  } catch (err) {
+    res.write(`data: ${JSON.stringify({ text: String(err), type: "error" })}\n\n`);
+    res.end();
+  }
+}
+
+// ─── Source-zip install ───────────────────────────────────────────────
+
+async function handleSourceZipInstall(res, zipUrl, version) {
+  const send = (event, data) => {
+    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  };
+
+  const url = zipUrl || LATEST_ZIP_URL;
+  const verLabel = version === "latest" ? "latest" : `v${version}`;
+
+  try {
+    send("progress", { percent: 2, line: `Preparing to install from source (${verLabel})...` });
+
+    // Determine extract destination
+    const extractBase = join(tmpdir(), `openclaw-src-${Date.now()}`);
+    const zipPath = join(tmpdir(), `openclaw-${version}.zip`);
+
+    // Step 1: Download zip
+    send("step", { step: "download", status: "running", message: `Downloading source zip (${verLabel})...` });
+    send("progress", { percent: 5, line: `Downloading from ${url}` });
+
+    const dlRes = await fetch(url, {
+      signal: AbortSignal.timeout(300_000),
+      headers: { "User-Agent": "openclaw-installer/1.0" },
+    });
+    if (!dlRes.ok) {
+      send("done", { ok: false, message: `Download failed: HTTP ${dlRes.status} from ${url}` });
+      res.end();
+      return;
+    }
+
+    const { writeFileSync: wf, mkdirSync: mds } = await import("node:fs");
+    mds(extractBase, { recursive: true });
+
+    const arrayBuf = await dlRes.arrayBuffer();
+    wf(zipPath, Buffer.from(arrayBuf));
+
+    send("step", { step: "download", status: "done", message: `Downloaded: ${Math.round(arrayBuf.byteLength / 1024)} KB` });
+    send("progress", { percent: 20, line: "Download complete, extracting..." });
+
+    // Step 2: Extract zip
+    send("step", { step: "extract", status: "running", message: "Extracting source archive..." });
+    let extractResult;
+    if (platform() === "win32") {
+      extractResult = await runCommand("powershell", [
+        "-NoProfile", "-Command",
+        `Expand-Archive -Path '${zipPath}' -DestinationPath '${extractBase}' -Force`,
+      ]);
+    } else {
+      extractResult = await runCommand("unzip", ["-q", "-o", zipPath, "-d", extractBase]);
+    }
+
+    if (!extractResult.ok) {
+      send("done", { ok: false, message: `Extract failed: ${extractResult.stderr || extractResult.stdout}` });
+      res.end();
+      return;
+    }
+
+    // Find the extracted directory (usually openclaw-XXXX/)
+    const { readdirSync } = await import("node:fs");
+    const entries = readdirSync(extractBase);
+    const subDir = entries.find((e) => e.startsWith("openclaw") || e.startsWith("OpenClaw"));
+    const srcDir = subDir ? join(extractBase, subDir) : extractBase;
+
+    send("step", { step: "extract", status: "done", message: `Extracted to ${srcDir}` });
+    send("progress", { percent: 35, line: "Installing dependencies (pnpm install)..." });
+
+    // Step 3: pnpm install
+    send("step", { step: "install-deps", status: "running", message: "Installing dependencies..." });
+    const pnpmVersion = tryExec("pnpm -v");
+    const pm = pnpmVersion ? "pnpm" : "npm";
+    const installArgs = pm === "pnpm" ? ["install"] : ["install"];
+
+    const installResult = await new Promise((resolve) => {
+      let stdout = "";
+      let stderr = "";
+      const child = spawn(pm, installArgs, {
+        shell: true,
+        cwd: srcDir,
+        env: { ...process.env, FORCE_COLOR: "0" },
+        timeout: 300_000,
+      });
+      child.stdout?.on("data", (d) => {
+        const chunk = d.toString();
+        stdout += chunk;
+        for (const line of chunk.split("\n").filter((l) => l.trim())) {
+          send("log", { text: line.trim() });
+        }
+      });
+      child.stderr?.on("data", (d) => {
+        const chunk = d.toString();
+        stderr += chunk;
+        for (const line of chunk.split("\n").filter((l) => l.trim())) {
+          send("log", { text: line.trim() });
+        }
+      });
+      child.on("close", (code) => resolve({ ok: code === 0, stdout: stdout.trim(), stderr: stderr.trim() }));
+      child.on("error", (err) => resolve({ ok: false, stdout, stderr: err.message }));
+    });
+
+    if (!installResult.ok) {
+      send("done", { ok: false, message: `Dependency install failed: ${installResult.stderr || installResult.stdout}` });
+      res.end();
+      return;
+    }
+    send("step", { step: "install-deps", status: "done", message: "Dependencies installed" });
+    send("progress", { percent: 60, line: "Building project..." });
+
+    // Step 4: build
+    send("step", { step: "build", status: "running", message: "Building project..." });
+    const buildResult = await new Promise((resolve) => {
+      let stdout = "";
+      let stderr = "";
+      const buildArgs = pm === "pnpm" ? ["build"] : ["run", "build"];
+      const child = spawn(pm, buildArgs, {
+        shell: true,
+        cwd: srcDir,
+        env: { ...process.env, FORCE_COLOR: "0" },
+        timeout: 600_000,
+      });
+      child.stdout?.on("data", (d) => {
+        const chunk = d.toString();
+        stdout += chunk;
+        for (const line of chunk.split("\n").filter((l) => l.trim())) {
+          send("log", { text: line.trim() });
+        }
+      });
+      child.stderr?.on("data", (d) => {
+        const chunk = d.toString();
+        stderr += chunk;
+        for (const line of chunk.split("\n").filter((l) => l.trim())) {
+          send("log", { text: line.trim() });
+        }
+      });
+      child.on("close", (code) => resolve({ ok: code === 0, stdout: stdout.trim(), stderr: stderr.trim() }));
+      child.on("error", (err) => resolve({ ok: false, stdout, stderr: err.message }));
+    });
+
+    if (!buildResult.ok) {
+      send("done", { ok: false, message: `Build failed: ${buildResult.stderr || buildResult.stdout}` });
+      res.end();
+      return;
+    }
+    send("step", { step: "build", status: "done", message: "Build complete" });
+    send("progress", { percent: 80, line: "Linking globally..." });
+
+    // Step 5: global link
+    send("step", { step: "link", status: "running", message: "Linking openclaw globally..." });
+    const linkArgs = pm === "pnpm" ? ["link", "--global"] : ["install", "-g", "."];
+    const linkResult = await runCommand(pm, linkArgs, srcDir);
+    if (!linkResult.ok) {
+      send("done", { ok: false, message: `Global link failed: ${linkResult.stderr || linkResult.stdout}` });
+      res.end();
+      return;
+    }
+    send("step", { step: "link", status: "done", message: "Globally linked" });
+    send("progress", { percent: 90, line: "Running onboard..." });
+
+    // Step 6: onboard
+    send("step", { step: "onboard", status: "running", message: "Running openclaw onboard..." });
+    const onboard = await runCommand("openclaw", ["onboard", "--install-daemon", "--non-interactive", "--accept-risk"]);
+    send("step", { step: "onboard", status: "done", message: "Onboard complete" });
+    send("progress", { percent: 100, line: "Installation complete!" });
+
+    // Cleanup
+    try { rmSync(zipPath, { force: true }); } catch { /* ignore */ }
+    try { rmSync(extractBase, { recursive: true, force: true }); } catch { /* ignore */ }
+
+    send("done", {
+      ok: true,
+      message: [
+        `Source install complete!`,
+        `Version: ${verLabel}`,
+        `Source URL: ${url}`,
+        "",
+        onboard.ok ? "Onboard: success" : "Onboard: skipped (run `openclaw onboard --install-daemon` manually)",
+      ].join("\n"),
+    });
+  } catch (err) {
+    send("done", { ok: false, message: String(err) });
+  }
+
+  res.end();
+}
+
+// Start config file watcher on server boot (best-effort)
+try { startConfigFileWatcher(); } catch { /* ignore */ }
+
 // ─── HTTP Server ─────────────────────────────────────────────────────
 
 function readBody(req) {
@@ -1906,6 +2400,98 @@ const server = createServer(async (req, res) => {
         }
       }
       json(200, { packages });
+      return;
+    }
+
+    // ─── Versions API ─────────────────────────────────────────────────
+    if (req.url === "/api/versions" && req.method === "GET") {
+      json(200, await fetchVersionsList());
+      return;
+    }
+
+    // ─── Config API ───────────────────────────────────────────────────
+    if (req.url === "/api/config/read" && req.method === "GET") {
+      json(200, await readOpenclawConfig());
+      return;
+    }
+
+    if (req.url === "/api/config/write" && req.method === "POST") {
+      const body = await readBody(req);
+      json(200, await writeOpenclawConfig(body.content || ""));
+      return;
+    }
+
+    if (req.url === "/api/config/reload" && req.method === "POST") {
+      json(200, await reloadGatewayConfig());
+      return;
+    }
+
+    if (req.url === "/api/config/watch" && req.method === "GET") {
+      res.writeHead(200, {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+        "Access-Control-Allow-Origin": "*",
+      });
+      registerConfigWatcher(res);
+      req.on("close", () => unregisterConfigWatcher(res));
+      return;
+    }
+
+    // ─── Gateway control API ──────────────────────────────────────────
+    if (req.url === "/api/gateway/status" && req.method === "GET") {
+      json(200, await getGatewayStatus());
+      return;
+    }
+
+    if (req.url === "/api/gateway/start" && req.method === "POST") {
+      res.writeHead(200, {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+        "Access-Control-Allow-Origin": "*",
+      });
+      await handleGatewayControl(res, "start");
+      return;
+    }
+
+    if (req.url === "/api/gateway/stop" && req.method === "POST") {
+      json(200, await stopGateway());
+      return;
+    }
+
+    if (req.url === "/api/gateway/restart" && req.method === "POST") {
+      res.writeHead(200, {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+        "Access-Control-Allow-Origin": "*",
+      });
+      await handleGatewayControl(res, "restart");
+      return;
+    }
+
+    if (req.url === "/api/gateway/logs" && req.method === "GET") {
+      res.writeHead(200, {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+        "Access-Control-Allow-Origin": "*",
+      });
+      await streamGatewayLogs(res);
+      return;
+    }
+
+    // ─── Source-zip install ───────────────────────────────────────────
+    if (req.url === "/api/install/source-zip" && req.method === "POST") {
+      const body = await readBody(req);
+      res.writeHead(200, {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+        "Access-Control-Allow-Origin": "*",
+      });
+      await handleSourceZipInstall(res, body.zipUrl || "", body.version || "latest");
       return;
     }
 
