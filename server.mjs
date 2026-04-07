@@ -5,9 +5,9 @@
  */
 import { createServer } from "node:http";
 import { execSync, spawn } from "node:child_process";
-import { existsSync, statSync, rmSync, mkdirSync, watch as fsWatch } from "node:fs";
+import { existsSync, statSync, rmSync, mkdirSync, readFileSync, watch as fsWatch } from "node:fs";
 import { homedir, platform, arch, cpus, totalmem, tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, extname } from "node:path";
 import { createConnection } from "node:net";
 
 const PORT = 3456;
@@ -2493,6 +2493,62 @@ const server = createServer(async (req, res) => {
       });
       await handleSourceZipInstall(res, body.zipUrl || "", body.version || "latest");
       return;
+    }
+
+    // ─── Static file serving (production: dist/ built by vite) ─────────
+    const DIST_DIR = join(import.meta.dirname, "dist");
+    if (existsSync(DIST_DIR)) {
+      const MIME = {
+        ".html":  "text/html; charset=utf-8",
+        ".js":    "application/javascript",
+        ".mjs":   "application/javascript",
+        ".css":   "text/css",
+        ".json":  "application/json",
+        ".png":   "image/png",
+        ".jpg":   "image/jpeg",
+        ".jpeg":  "image/jpeg",
+        ".gif":   "image/gif",
+        ".svg":   "image/svg+xml",
+        ".ico":   "image/x-icon",
+        ".woff":  "font/woff",
+        ".woff2": "font/woff2",
+        ".ttf":   "font/ttf",
+        ".webp":  "image/webp",
+        ".txt":   "text/plain",
+      };
+      const BINARY_EXTS = new Set([".png", ".jpg", ".jpeg", ".gif", ".ico", ".woff", ".woff2", ".ttf", ".webp"]);
+
+      let urlPath = (req.url || "/").split("?")[0];
+      if (urlPath === "/") urlPath = "/index.html";
+
+      const filePath = join(DIST_DIR, urlPath);
+      // Security: reject path traversal
+      if (!filePath.startsWith(DIST_DIR + "/") && filePath !== DIST_DIR) {
+        res.writeHead(403); res.end("Forbidden"); return;
+      }
+
+      if (existsSync(filePath) && statSync(filePath).isFile()) {
+        const ext = extname(filePath);
+        const mime = MIME[ext] || "application/octet-stream";
+        const content = BINARY_EXTS.has(ext) ? readFileSync(filePath) : readFileSync(filePath, "utf-8");
+        res.writeHead(200, {
+          "Content-Type": mime,
+          "Cache-Control": ext === ".html" ? "no-cache" : "public, max-age=86400",
+        });
+        res.end(content);
+        return;
+      }
+
+      // SPA fallback: serve index.html for client-side routes
+      const ext = extname(urlPath);
+      if (!ext || !MIME[ext]) {
+        const indexPath = join(DIST_DIR, "index.html");
+        if (existsSync(indexPath)) {
+          res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache" });
+          res.end(readFileSync(indexPath, "utf-8"));
+          return;
+        }
+      }
     }
 
     res.writeHead(404);
