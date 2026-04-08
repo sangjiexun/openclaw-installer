@@ -1,0 +1,100 @@
+{
+  "name": "openclaw-installer",
+  "version": "1.0.0",
+  "description": "OpenClaw Gateway Installation Wizard",
+  "main": "electron/main.js",
+  "scripts": {
+    "postinstall": "electron-rebuild -f -m better-sqlite3",
+    "predev": "kill-port 5173",
+    "dev": "concurrently -k \"vite --port 5173\" \"wait-on http://localhost:5173 && cross-env VITE_DEV_SERVER_URL=http://localhost:5173 electron .\"",
+    "dev:reset": "kill-port 5173 && node -e \"try{require('child_process').execSync('taskkill /F /IM electron.exe /T',{stdio:'ignore'})}catch(e){}\" && pnpm run dev",
+    "dev:vite": "vite",
+    "dev:electron": "wait-on http://localhost:5173 && cross-env VITE_DEV_SERVER_URL=http://localhost:5173 electron .",
+    "build": "vite build && electron-builder --win --ia32 --x64",
+    "build:vite": "vite build",
+    "build:x64": "vite build && electron-builder --win --x64",
+    "build:ia32": "vite build && electron-builder --win --ia32",
+    "preview": "vite build && electron ."
+  },
+  "build": {
+    "appId": "com.openclaw.installer",
+    "productName": "OpenClaw",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "assets/**/*",
+      "cert/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "cert",
+        "to": "cert"
+      }
+    ],
+    "win": {
+      "icon": "assets/icon.ico",
+      "requestedExecutionLevel": "requireAdministrator",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64",
+            "ia32"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": true,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "assets/icon.ico",
+      "uninstallerIcon": "assets/icon.ico",
+      "installerHeaderIcon": "assets/icon.ico",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "OpenClaw",
+      "artifactName": "OpenClaw-Setup-${version}-${arch}.${ext}"
+    }
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@types/archiver": "^7.0.0",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "concurrently": "^9.2.1",
+    "cross-env": "^10.1.0",
+    "electron": "^41.1.1",
+    "electron-builder": "^26.8.1",
+    "electron-rebuild": "^3.2.9",
+    "kill-port": "^2.0.1",
+    "png-to-ico": "^3.0.1",
+    "sharp": "^0.34.5",
+    "typescript": "^5.9.3",
+    "vite": "^8.0.1",
+    "wait-on": "^9.0.4"
+  },
+  "dependencies": {
+    "@tailwindcss/vite": "^4.2.2",
+    "adm-zip": "^0.5.17",
+    "archiver": "^7.0.1",
+    "better-sqlite3": "^12.8.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.577.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "tailwind-merge": "^3.5.0",
+    "tailwindcss": "^4.2.2"
+  }
+}

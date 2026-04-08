@@ -1,0 +1,20 @@
+{
+  "version": "1.0.0",
+  "plans": {
+    "monthly": {
+      "name": "月度订阅",
+      "price": 49,
+      "unit": "月",
+      "description": "OpenClaw VIP 月度会员",
+      "enabled": true
+    },
+    "install": {
+      "name": "上门安装",
+      "price": 499,
+      "unit": "次",
+      "description": "OpenClaw 上门安装服务",
+      "enabled": false
+    }
+  },
+  "updatedAt": "2026-03-20"
+}

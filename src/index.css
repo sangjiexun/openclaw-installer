@@ -1,0 +1,66 @@
+@import "tailwindcss";
+
+@theme {
+    --color-border: oklch(0.274 0.006 286.033);
+    --color-input: oklch(0.274 0.006 286.033);
+    --color-ring: oklch(0.871 0.006 286.033);
+    --color-background: oklch(0.141 0.005 286.033);
+    --color-foreground: oklch(0.985 0 0);
+    --color-primary: oklch(0.985 0 0);
+    --color-primary-foreground: oklch(0.205 0.006 286.033);
+    --color-secondary: oklch(0.274 0.006 286.033);
+    --color-secondary-foreground: oklch(0.985 0 0);
+    --color-destructive: oklch(0.396 0.141 25.723);
+    --color-destructive-foreground: oklch(0.985 0 0);
+    --color-muted: oklch(0.274 0.006 286.033);
+    --color-muted-foreground: oklch(0.708 0.006 286.033);
+    --color-accent: oklch(0.274 0.006 286.033);
+    --color-accent-foreground: oklch(0.985 0 0);
+    --color-popover: oklch(0.141 0.005 286.033);
+    --color-popover-foreground: oklch(0.985 0 0);
+    --color-card: oklch(0.141 0.005 286.033);
+    --color-card-foreground: oklch(0.985 0 0);
+    --color-success: oklch(0.627 0.194 149.214);
+    --color-warning: oklch(0.769 0.189 70.08);
+    --radius: 0.5rem;
+}
+
+* {
+    border-color: var(--color-border);
+}
+
+body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: system-ui, -apple-system, sans-serif;
+    margin: 0;
+    overflow: hidden;
+    user-select: none;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+    width: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: oklch(0.274 0.006 286.033);
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: oklch(0.4 0.006 286.033);
+}
+
+/* Title bar drag region */
+.titlebar-drag {
+    -webkit-app-region: drag;
+}
+
+.titlebar-no-drag {
+    -webkit-app-region: no-drag;
+}

@@ -1,0 +1,6 @@
+allowBuilds:
+  better-sqlite3: false
+  electron: false
+  electron-winstaller: false
+  lzma-native: false
+  sharp: false

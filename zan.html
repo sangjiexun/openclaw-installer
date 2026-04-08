@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenClaw 赞助支持</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+            background: linear-gradient(135deg, #0a0a0f 0%, #1a1a2e 50%, #0a0a0f 100%);
+            color: #e0e0e0;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Animated background particles */
+        .bg-particles {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+            background:
+                radial-gradient(circle at 20% 30%, rgba(59, 130, 246, 0.08) 0%, transparent 50%),
+                radial-gradient(circle at 80% 70%, rgba(99, 102, 241, 0.06) 0%, transparent 50%),
+                radial-gradient(circle at 50% 50%, rgba(37, 99, 235, 0.04) 0%, transparent 70%);
+        }
+
+        .container {
+            max-width: 720px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            font-size: 2em;
+            font-weight: 800;
+            background: linear-gradient(90deg, #3b82f6, #818cf8, #3b82f6);
+            background-size: 200% 100%;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: shimmer 3s ease-in-out infinite;
+        }
+
+        @keyframes shimmer {
+
+            0%,
+            100% {
+                background-position: 0% 50%;
+            }
+
+            50% {
+                background-position: 100% 50%;
+            }
+        }
+
+        .header .subtitle {
+            margin-top: 8px;
+            color: #9ca3af;
+            font-size: 0.95em;
+        }
+
+        .cube-icon {
+            display: inline-block;
+            width: 48px;
+            height: 48px;
+            margin-bottom: 12px;
+            animation: rotateCube 4s linear infinite;
+            perspective: 100px;
+        }
+
+        .cube-icon .face {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, #2563eb, #60a5fa);
+            border: 2px solid rgba(96, 165, 250, 0.5);
+            border-radius: 8px;
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.4);
+        }
+
+        @keyframes rotateCube {
+            0% {
+                transform: rotateY(0deg) rotateX(15deg);
+            }
+
+            100% {
+                transform: rotateY(360deg) rotateX(15deg);
+            }
+        }
+
+        /* Card */
+        .card {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            padding: 28px;
+            margin-bottom: 24px;
+            backdrop-filter: blur(10px);
+            transition: border-color 0.3s;
+        }
+
+        .card:hover {
+            border-color: rgba(59, 130, 246, 0.3);
+        }
+
+        .card h2 {
+            font-size: 1.2em;
+            font-weight: 700;
+            margin-bottom: 12px;
+            color: #f0f0f0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .card h2 .emoji {
+            font-size: 1.3em;
+        }
+
+        /* QR Code Section */
+        .qr-section {
+            text-align: center;
+        }
+
+        .qr-section img {
+            width: 220px;
+            height: 220px;
+            border-radius: 12px;
+            border: 2px solid rgba(59, 130, 246, 0.3);
+            box-shadow: 0 0 30px rgba(59, 130, 246, 0.15);
+            margin: 16px auto;
+            display: block;
+            background: #fff;
+            padding: 8px;
+        }
+
+        .qr-section .label {
+            color: #9ca3af;
+            font-size: 0.85em;
+            margin-top: 8px;
+        }
+
+        /* Message */
+        .message {
+            font-size: 0.95em;
+            line-height: 1.8;
+            color: #d1d5db;
+        }
+
+        .message .highlight {
+            color: #60a5fa;
+            font-weight: 600;
+        }
+
+        .message .amount {
+            color: #fbbf24;
+            font-weight: 700;
+            font-size: 1.1em;
+        }
+
+        /* Sponsor Card */
+        .sponsor-card {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            padding: 20px;
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.08), rgba(99, 102, 241, 0.05));
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            border-radius: 12px;
+            margin: 16px 0;
+        }
+
+        .sponsor-card img {
+            width: 72px;
+            height: 72px;
+            border-radius: 50%;
+            border: 2px solid rgba(59, 130, 246, 0.4);
+            object-fit: cover;
+        }
+
+        .sponsor-card .info {
+            flex: 1;
+        }
+
+        .sponsor-card .name {
+            font-size: 1.1em;
+            font-weight: 700;
+            color: #f0f0f0;
+        }
+
+        .sponsor-card .amount-badge {
+            display: inline-block;
+            margin-top: 6px;
+            padding: 4px 12px;
+            background: linear-gradient(90deg, #f59e0b, #f97316);
+            color: #000;
+            font-weight: 700;
+            font-size: 0.85em;
+            border-radius: 20px;
+        }
+
+        .sponsor-card .desc {
+            margin-top: 6px;
+            color: #9ca3af;
+            font-size: 0.85em;
+        }
+
+        /* Charity Section */
+        .charity-img {
+            width: 100%;
+            max-width: 400px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            margin: 16px auto;
+            display: block;
+        }
+
+        .charity-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 14px;
+            background: rgba(34, 197, 94, 0.15);
+            border: 1px solid rgba(34, 197, 94, 0.3);
+            color: #4ade80;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 600;
+            margin: 8px 0;
+        }
+
+        /* CTA */
+        .cta-section {
+            text-align: center;
+            padding: 24px;
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(147, 51, 234, 0.08));
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            border-radius: 16px;
+        }
+
+        .cta-section h3 {
+            font-size: 1.1em;
+            font-weight: 700;
+            color: #f0f0f0;
+            margin-bottom: 8px;
+        }
+
+        .cta-section p {
+            color: #9ca3af;
+            font-size: 0.9em;
+            line-height: 1.6;
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
+            color: #6b7280;
+            font-size: 0.8em;
+        }
+
+        /* Responsive */
+        @media (max-width: 480px) {
+            .container {
+                padding: 20px 12px;
+            }
+
+            .header h1 {
+                font-size: 1.5em;
+            }
+
+            .sponsor-card {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .qr-section img {
+                width: 180px;
+                height: 180px;
+            }
+        }
+
+        /* Pulse animation for QR */
+        .pulse-ring {
+            display: inline-block;
+            position: relative;
+        }
+
+        .pulse-ring::before {
+            content: '';
+            position: absolute;
+            top: -4px;
+            left: -4px;
+            right: -4px;
+            bottom: -4px;
+            border-radius: 16px;
+            border: 2px solid rgba(59, 130, 246, 0.3);
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+
+            50% {
+                opacity: 0.5;
+                transform: scale(1.02);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="bg-particles"></div>
+    <div class="container">
+
+        <!-- Header -->
+        <div class="header">
+            <div class="cube-icon">
+                <div class="face"></div>
+            </div>
+            <h1>OpenClaw 赞助支持</h1>
+            <p class="subtitle">感谢每一位支持者，让开源持续运转</p>
+        </div>
+
+        <!-- Main Message -->
+        <div class="card">
+            <h2><span class="emoji">💙</span> 致各位云股东</h2>
+            <div class="message">
+                <p>各位<span class="highlight">云股东</span>大家好！</p>
+                <p style="margin-top: 12px;">
+                    本项目的<span class="highlight">免费 Token</span> 来自个人服务器机房，感谢大家使用。
+                    希望能够让我们的服务持续运行下去。
+                </p>
+                <p style="margin-top: 12px;">
+                    每月我将拿出总赞助金额的 <span class="amount">300 元</span> 资助爱心公益。
+                </p>
+            </div>
+        </div>
+
+        <!-- QR Code -->
+        <div class="card qr-section">
+            <h2><span class="emoji">🎁</span> 扫码赞助</h2>
+            <div class="pulse-ring">
+                <img src="zan.png" alt="赞助二维码">
+            </div>
+            <p class="label">微信扫码即可赞助，金额随意</p>
+        </div>
+
+        <!-- Sponsor -->
+        <div class="card">
+            <h2><span class="emoji">🏆</span> 当前项目赞助人</h2>
+            <div class="sponsor-card">
+                <img src="zan01.png" alt="刘老板">
+                <div class="info">
+                    <div class="name">刘老板</div>
+                    <div class="amount-badge">已赞助 ¥7,000</div>
+                    <div class="desc">长期支持本项目，是本项目最大的赞助人</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charity -->
+        <div class="card">
+            <h2><span class="emoji">🌿</span> 公益事业</h2>
+            <div class="charity-badge">🤝 每月固定捐赠 300 元</div>
+            <p class="message" style="margin: 12px 0;">
+                每月从总赞助金额中拿出 300 元用于公益事业，帮助有需要的人。以下是公益捐赠记录：
+            </p>
+            <img src="gongyi.png" alt="公益事业截图" class="charity-img">
+        </div>
+
+        <!-- CTA -->
+        <div class="cta-section">
+            <h3>🤝 广告加盟合作</h3>
+            <p>
+                欢迎各地老板在本软件进行广告加盟<br>
+                共同赞助开源生态和公益事业<br>
+                如有意向请通过赞助码联系作者
+            </p>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p>OpenClaw Gateway &copy; 2026 &mdash; 开源改变世界</p>
+        </div>
+
+    </div>
+</body>
+
+</html>
